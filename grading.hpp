@@ -49,12 +49,12 @@ std::ostream &operator<<(std::ostream &os, const struct Record &rec)
   std::stringstream ss;
   if (!rec.pass)
   {
-    ss << "[" << rec.name << " FAILED]" << std::endl
+    ss << "\u001b[31m[" << rec.name << " FAILED]\033[0m" << std::endl
       << rec.feedback << std::endl;
   }
   else
   {
-    ss << "[" << rec.name << " PASSED]" << std::endl;
+    ss << "\u001b[32m[" << rec.name << " PASSED]\033[0m" << std::endl;
   }
   os << ss.str();
   return os;
@@ -76,9 +76,10 @@ using GETest = struct GETest
 class GradingEnv
 {
 public:
-  GradingEnv()
+  GradingEnv(bool showComp = false)
       : _currentTest(0),
-        _currentTestName("")
+        _currentTestName(""),
+        _showComp(showComp)
   {
   }
 
@@ -105,7 +106,7 @@ public:
     }
   }
 
-  void run_all(bool report = true)
+  void run_all(bool report = true, bool verbose = false)
   {
     std::for_each(
         _tests.cbegin(),
@@ -118,7 +119,7 @@ public:
         });
 
     if (report)
-      _report();
+      _report(verbose);
   }
 
   // Assert equality within the environment
@@ -136,9 +137,14 @@ public:
     {
       rec.pass = false;
       std::stringstream ss;
+
+      if (_showComp == true)
+        ss << "  \u001b[31mTest: " << l << " == " << r;
+
       ss << "  Expected: " << r << std::endl
          << "  Got: " << l << std::endl
-         << "  Message: " << msg;
+         << "  Message: " << msg << "\033[0m" << std::endl;
+
       rec.feedback = ss.str();
     }
     _insertRecord(rec);
@@ -162,24 +168,29 @@ private:
     }
   }
 
-  void _report()
+  void _report(bool verbose)
   {
     float passed = 0;
     float tests = 0;
     std::for_each(
         _records.begin(),
         _records.end(),
-        [&passed, &tests](const auto &pair) {
+        [&](const auto &pair) {
           std::for_each(
               std::begin(pair.second),
               std::end(pair.second),
-              [&passed, &tests](const Record &rec) {
+              [&](const Record &rec) {
                 tests++;
                 if (rec.pass == true)
                 {
                   passed++;
+
+                  // Only print passed if verbose is on
+                  if (verbose == true)
+                    std::cout << rec << std::endl;
+                } else {
+                  std::cout << rec << std::endl;
                 }
-                std::cout << rec << std::endl;
               });
         });
 
@@ -197,6 +208,7 @@ private:
 
 private:
   uint8_t _currentTest;
+  bool _showComp;
   std::string _currentTestName;
   std::vector<GETest> _tests;
   std::map<uint8_t, GERecords> _records;
