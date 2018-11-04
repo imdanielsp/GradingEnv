@@ -139,7 +139,7 @@ public:
       std::stringstream ss;
 
       if (_showComp == true)
-        ss << "  \u001b[31mTest: " << l << " == " << r;
+        ss << "  \u001b[31mTest: " << l << " == " << r << std::endl;
 
       ss << "  Expected: " << r << std::endl
          << "  Got: " << l << std::endl
