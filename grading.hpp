@@ -201,3 +201,11 @@ private:
   std::vector<GETest> _tests;
   std::map<uint8_t, GERecords> _records;
 };
+
+// Generates a test to avoid boilerplate using the following semantics:
+// test("name" { ... })
+// the GravingEnv& is in the scope as env
+#define test_f(Name, Function) \
+{\
+ Name, [&](GradingEnv& env) Function \
+}
