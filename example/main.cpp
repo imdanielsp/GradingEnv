@@ -28,20 +28,21 @@
 void exampleTest(GradingEnv& env)
 {
   // The third parameter is a message that is only displayed iff the test fails.
-  env.expect_eq<std::string>("Test1", "Test1", "The string aren't equal");
+  env.expect_eq<std::string>("Test1", "Test1");
 }
 
 int main(int argc, char const *argv[])
 {
   GradingEnv ge;
 
-  // A test is a name and a function, e.g. {"name", f1}.
-  ge.add_test({"Example", exampleTest});
+  // A test is a name and a function, e.g. {"name", "feedback", f1}.
+  ge.add_test({"Example", "Error message", exampleTest});
 
   // A lambda can also be used.
-  ge.add_test({"Test",
+  ge.add_test({"Test", "Error message",
     [](GradingEnv& env) {
-      env.expect_eq<int>(1, 2, "The test failed!");
+      env.expect_eq<int>(1, 2);
+      env.expect_false(1 == 2);
     }
   });
 
@@ -49,24 +50,50 @@ int main(int argc, char const *argv[])
   ge.add_test({
     {
       "Example2",
+      "Error message",
       exampleTest
     },
     {
       "Addition",
+      "Error message",
       [](GradingEnv& env) {
-        env.expect_eq<int>(1, 2, "The test failed!");
+        env.expect_eq<int>(1, 2);
+        env.expect_true(1 == 1);
       }
     },
     {
       "Division",
+      "Error message",
       [](GradingEnv& env) {
-        env.expect_eq<int>(2, 2, "The test failed!");
+        env.expect_eq<int>(2, 2);
       }
     },
   });
 
+  // Add tests with some macro magic
+  ge.add_test({
+    test_f("Test name", "Feedback", {
+      env.expect_false(9 == 2);
+    }),
+    test_f("Test name", "Feedback", {
+      env.expect_eq<std::string>("a", "b");
+    }),
+  });
+
+  ge.add_test(
+    test_f(
+      "Testing using loops", 
+      "We know there are some numbers that are equal :)", {
+      for (int i = 0; i < 5; i++) {
+        for (int j = 0; j < 5; j++) {
+          env.expect_neq(i, j);
+        }
+      }
+    })
+  );
+
   // Run all tests
-  ge.run_all();
+  ge.run_all(true, true);
 
   return 0;
 }

@@ -31,14 +31,14 @@
 #include <sstream>
 #include <iostream>
 #include <cmath>
+#include <memory>
+#include <optional>
 
 // Represents a record for a test
 using GERecord = struct Record
 {
   bool pass;
-  std::string feedback;
-  std::string name;
-
+  std::optional<std::string> reason;
   friend std::ostream &operator<<(std::ostream &os, const struct Record &rec);
 };
 
@@ -49,13 +49,11 @@ std::ostream &operator<<(std::ostream &os, const struct Record &rec)
   std::stringstream ss;
   if (!rec.pass)
   {
-    ss << "\u001b[31m[" << rec.name << " FAILED]\033[0m" << std::endl
-      << rec.feedback << std::endl;
+    ss << "\u001b[31m[TEST CASE FAILED]" << std::endl
+       << "    Reason: " << rec.reason.value_or("no provided")
+       << "\033[0m";
   }
-  else
-  {
-    ss << "\u001b[32m[" << rec.name << " PASSED]\033[0m" << std::endl;
-  }
+
   os << ss.str();
   return os;
 }
@@ -63,23 +61,22 @@ std::ostream &operator<<(std::ostream &os, const struct Record &rec)
 // Class Forwarding
 class GradingEnv;
 
-// 
+//
 using GEFunction = std::function<void(GradingEnv &env)>;
 
 // Represents a test
 using GETest = struct GETest
 {
+  int id;
   std::string name;
+  std::string feedback;
   GEFunction f;
 };
 
 class GradingEnv
 {
 public:
-  GradingEnv(bool showComp = false)
-      : _currentTest(0),
-        _currentTestName(""),
-        _showComp(showComp)
+  GradingEnv(bool showComp = false) : _currentTest(nullptr)
   {
   }
 
@@ -91,63 +88,109 @@ public:
   GradingEnv &operator=(GradingEnv &) = delete;
   GradingEnv &&operator=(GradingEnv &&) = delete;
 
-  void add_test(std::pair<std::string, GEFunction> t)
+  // Adds a test to the environment. A test is a tuple containing:
+  // (name, feedback, function)
+  void add_test(std::tuple<std::string, std::string, GEFunction> t)
   {
-    _tests.push_back(GETest{t.first, t.second});
+    auto [name, feedback, func] = t;
+    _tests.push_back(GETest{GradingEnv::_idCounter, name, feedback, func});
+    GradingEnv::_idCounter++;
   }
 
+  // Same as above but takes a list of tuples in the following form:
+  // { (name, feedback, function)* }
   void add_test(
-      const std::initializer_list<
-          std::pair<const std::string &, GEFunction>> &tests)
+      const std::initializer_list<std::tuple<std::string, std::string, GEFunction>> &tests)
   {
     for (const auto &test : tests)
     {
-      _tests.push_back(GETest{test.first, test.second});
+      add_test(test);
     }
   }
 
+  // Run all the test in the environment
   void run_all(bool report = true, bool verbose = false)
   {
     std::for_each(
-        _tests.cbegin(),
-        _tests.cend(),
-        [this](const GETest &it) {
-          _currentTestName = it.name;
+        _tests.begin(),
+        _tests.end(),
+        [this](GETest &it) {
+          _currentTest.release();
+          _currentTest = std::make_unique<GETest>(it);
           // Each function needs the environment, thus *this
           it.f(*this);
-          _nextTest();
         });
 
     if (report)
       _report(verbose);
   }
 
-  // Assert equality within the environment
-  template <typename T>
-  void expect_eq(const T &l, const T &r, const std::string &msg)
+  template <typename... Types,
+            typename Comp = std::function<bool(const Types &...)>>
+  void expect(Types... args, std::string reason, Comp c)
   {
     Record rec;
-    rec.name = _currentTestName;
-    if (l == r)
+    if (c(args...) == true)
     {
       rec.pass = true;
-      rec.feedback = "Passed!";
+      rec.reason = {};
     }
     else
     {
       rec.pass = false;
+
       std::stringstream ss;
-
-      if (_showComp == true)
-        ss << "  \u001b[31mTest: " << l << " == " << r << std::endl;
-
-      ss << "  Expected: " << r << std::endl
-         << "  Got: " << l << std::endl
-         << "  Message: " << msg << "\033[0m" << std::endl;
-
-      rec.feedback = ss.str();
+      ss << "\u001b[31m" << reason << "\033[0m" << std::endl;
+      rec.reason = ss.str();
     }
     _insertRecord(rec);
+  }
+
+  // Assert equality within the environment
+  template <typename T>
+  void expect_eq(const T &l, const T &r)
+  {
+    std::stringstream reason;
+    reason << l << " != " << r;
+
+    expect<T, T>(l, r, reason.str(),
+                 [](const T &l, const T &r) {
+                   return l == r;
+                 });
+  }
+
+  template <typename T>
+  void expect_neq(const T &l, const T &r)
+  {
+    std::stringstream reason;
+    reason << l << " == " << r;
+
+    expect<T, T>(l, r, reason.str(),
+                 [](const T &l, const T &r) {
+                   return l != r;
+                 });
+  }
+
+  void expect_true(bool val)
+  {
+    std::stringstream reason;
+    reason << "value is false";
+
+    expect<bool>(val, reason.str(),
+                 [](bool val) {
+                   return val == true;
+                 });
+  }
+
+  void expect_false(bool val)
+  {
+    std::stringstream reason;
+    reason << "value is true";
+
+    expect<bool>(val, reason.str(),
+                 [](bool val) {
+                   return val == false;
+                 });
   }
 
 private:
@@ -156,7 +199,7 @@ private:
   // test.
   void _insertRecord(const Record &rec)
   {
-    auto record = _records.find(_currentTest);
+    auto record = _records.find(_currentTest->id);
 
     if (record != _records.end())
     {
@@ -164,60 +207,69 @@ private:
     }
     else
     {
-      _records.emplace(_currentTest, GERecords{rec});
+      _records.emplace(_currentTest->id, GERecords{rec});
     }
   }
 
   void _report(bool verbose)
   {
-    float passed = 0;
-    float tests = 0;
+    float passedCounter = 0;
+    float testCounter = 0;
+
     std::for_each(
         _records.begin(),
         _records.end(),
         [&](const auto &pair) {
+          int failedRecord = 0;
+          testCounter++;
+
+          GETest test = _tests.at(pair.first);
+          std::cout << "\u001b[32m[RUNNING " << test.name << "]\033[0m" << std::endl;
+          // For each record in the test
           std::for_each(
               std::begin(pair.second),
               std::end(pair.second),
-              [&](const Record &rec) {
-                tests++;
-                if (rec.pass == true)
+              [&](const GERecord &rec) {
+                if (rec.pass == false)
                 {
-                  passed++;
-
-                  // Only print passed if verbose is on
-                  if (verbose == true)
-                    std::cout << rec << std::endl;
-                } else {
-                  std::cout << rec << std::endl;
+                  failedRecord++;
+                  std::cout << "  " << rec;
                 }
               });
+          // If verbose is on and test passed, print
+          if (verbose == true && failedRecord == 0)
+          {
+            passedCounter++;
+            std::cout << "  \u001b[32m[PASSED]\033[0m" << std::endl;
+          } else {
+            std::cout << "  \u001b[31mFeedback: "
+                      << test.feedback
+                      << "\033[0m"
+                      << std::endl;
+          }
         });
 
-    int percentage = std::ceil((passed / tests) * 100);
-    std::cout << percentage << "% of test passed" << std::endl;
-  }
-
-  // Prepares the environment for the next test. Might seen trivial now, but if
-  // it the environment gets more complex, this can serve as a "next
-  // configuration" function.
-  void _nextTest()
-  {
-    _currentTest++;
+    int percentage = std::ceil((passedCounter / testCounter) * 100);
+    std::cout << std::endl
+              << "\u001b[32m"
+              << percentage
+              << "% of test passed\033[0m"
+              << std::endl;
   }
 
 private:
-  uint8_t _currentTest;
-  bool _showComp;
-  std::string _currentTestName;
+  static int _idCounter;
+  std::unique_ptr<GETest> _currentTest;
   std::vector<GETest> _tests;
-  std::map<uint8_t, GERecords> _records;
+  std::map<int, GERecords> _records;
 };
 
+int GradingEnv::_idCounter = 0;
+
 // Generates a test to avoid boilerplate using the following semantics:
-// test("name" { ... })
+// test_f("name" { ... })
 // the GravingEnv& is in the scope as env
-#define test_f(Name, Function) \
-{\
- Name, [&](GradingEnv& env) Function \
-}
+#define test_f(Name, Feedback, Scope)           \
+  {                                             \
+    Name, Feedback, [&](GradingEnv & env) Scope \
+  }\
