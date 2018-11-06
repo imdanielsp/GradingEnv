@@ -1,1 +1,1 @@
-# Grading Framework
+# Minimal Testing Framework

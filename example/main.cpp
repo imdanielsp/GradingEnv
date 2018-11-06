@@ -23,7 +23,7 @@
  * SOFTWARE.
  * */
 #include <iostream>
-#include "../grading.hpp"
+#include "../mtest.hpp"
 
 void exampleTest(GradingEnv& env)
 {
