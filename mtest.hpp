@@ -38,6 +38,7 @@
 using MTRecord = struct Record
 {
   bool pass;
+  bool printable;
   std::optional<std::string> reason;
   friend std::ostream &operator<<(std::ostream &os, const struct Record &rec);
 };
@@ -47,9 +48,9 @@ using MTRecords = std::vector<Record>;
 std::ostream &operator<<(std::ostream &os, const struct Record &rec)
 {
   std::stringstream ss;
-  if (!rec.pass)
+  if (!rec.pass && rec.printable)
   {
-    ss << "\u001b[31m[TEST CASE FAILED]" << std::endl
+    ss << "  \u001b[31m[TEST CASE FAILED]" << std::endl
        << "    Reason: " << rec.reason.value_or("no provided")
        << "\033[0m";
   }
@@ -127,9 +128,10 @@ public:
 
   template <typename... Types,
             typename Comp = std::function<bool(const Types &...)>>
-  void expect(Types... args, std::string reason, Comp c)
+  void expect(Types... args, std::string reason, Comp c, bool printable)
   {
     Record rec;
+    rec.printable = printable;
     if (c(args...) == true)
     {
       rec.pass = true;
@@ -148,7 +150,7 @@ public:
 
   // Assert equality within the environment
   template <typename T>
-  void expect_eq(const T &l, const T &r)
+  void expect_eq(const T &l, const T &r, bool printable = true)
   {
     std::stringstream reason;
     reason << l << " != " << r;
@@ -156,11 +158,11 @@ public:
     expect<T, T>(l, r, reason.str(),
                  [](const T &l, const T &r) {
                    return l == r;
-                 });
+                 }, printable);
   }
 
   template <typename T>
-  void expect_neq(const T &l, const T &r)
+  void expect_neq(const T &l, const T &r, bool printable = true)
   {
     std::stringstream reason;
     reason << l << " == " << r;
@@ -168,10 +170,10 @@ public:
     expect<T, T>(l, r, reason.str(),
                  [](const T &l, const T &r) {
                    return l != r;
-                 });
+                 }, printable);
   }
 
-  void expect_true(bool val)
+  void expect_true(bool val, bool printable = true)
   {
     std::stringstream reason;
     reason << "value is false";
@@ -179,10 +181,10 @@ public:
     expect<bool>(val, reason.str(),
                  [](bool val) {
                    return val == true;
-                 });
+                 }, printable);
   }
 
-  void expect_false(bool val)
+  void expect_false(bool val, bool printable = true)
   {
     std::stringstream reason;
     reason << "value is true";
@@ -190,7 +192,7 @@ public:
     expect<bool>(val, reason.str(),
                  [](bool val) {
                    return val == false;
-                 });
+                 }, printable);
   }
 
 private:
@@ -233,11 +235,13 @@ private:
                 if (rec.pass == false)
                 {
                   failedRecord++;
-                  std::cout << "  " << rec;
                 }
+
+                std::cout << rec;
               });
+
           // If verbose is on and test passed, print
-          if (verbose == true && failedRecord == 0)
+          if (failedRecord == 0)
           {
             passedCounter++;
             std::cout << "  \u001b[32m[PASSED]\033[0m" << std::endl;
