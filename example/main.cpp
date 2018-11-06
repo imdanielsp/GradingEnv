@@ -25,7 +25,7 @@
 #include <iostream>
 #include "../mtest.hpp"
 
-void exampleTest(GradingEnv& env)
+void exampleTest(MTEnv& env)
 {
   // The third parameter is a message that is only displayed iff the test fails.
   env.expect_eq<std::string>("Test1", "Test1");
@@ -33,14 +33,14 @@ void exampleTest(GradingEnv& env)
 
 int main(int argc, char const *argv[])
 {
-  GradingEnv ge;
+  MTEnv ge;
 
   // A test is a name and a function, e.g. {"name", "feedback", f1}.
   ge.add_test({"Example", "Error message", exampleTest});
 
   // A lambda can also be used.
   ge.add_test({"Test", "Error message",
-    [](GradingEnv& env) {
+    [](MTEnv& env) {
       env.expect_eq<int>(1, 2);
       env.expect_false(1 == 2);
     }
@@ -56,7 +56,7 @@ int main(int argc, char const *argv[])
     {
       "Addition",
       "Error message",
-      [](GradingEnv& env) {
+      [](MTEnv& env) {
         env.expect_eq<int>(1, 2);
         env.expect_true(1 == 1);
       }
@@ -64,7 +64,7 @@ int main(int argc, char const *argv[])
     {
       "Division",
       "Error message",
-      [](GradingEnv& env) {
+      [](MTEnv& env) {
         env.expect_eq<int>(2, 2);
       }
     },

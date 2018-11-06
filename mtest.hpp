@@ -16,8 +16,8 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINMTMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAMTS OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
@@ -35,14 +35,14 @@
 #include <optional>
 
 // Represents a record for a test
-using GERecord = struct Record
+using MTRecord = struct Record
 {
   bool pass;
   std::optional<std::string> reason;
   friend std::ostream &operator<<(std::ostream &os, const struct Record &rec);
 };
 
-using GERecords = std::vector<Record>;
+using MTRecords = std::vector<Record>;
 
 std::ostream &operator<<(std::ostream &os, const struct Record &rec)
 {
@@ -59,48 +59,48 @@ std::ostream &operator<<(std::ostream &os, const struct Record &rec)
 }
 
 // Class Forwarding
-class GradingEnv;
+class MTEnv;
 
 //
-using GEFunction = std::function<void(GradingEnv &env)>;
+using MTFunction = std::function<void(MTEnv &env)>;
 
 // Represents a test
-using GETest = struct GETest
+using MTTest = struct MTTest
 {
   int id;
   std::string name;
   std::string feedback;
-  GEFunction f;
+  MTFunction f;
 };
 
-class GradingEnv
+class MTEnv
 {
 public:
-  GradingEnv(bool showComp = false) : _currentTest(nullptr)
+  MTEnv(bool showComp = false) : _currentTest(nullptr)
   {
   }
 
-  ~GradingEnv() = default;
+  ~MTEnv() = default;
 
   // Non-copyable and non-movable
-  GradingEnv(GradingEnv &) = delete;
-  GradingEnv(GradingEnv &&) = delete;
-  GradingEnv &operator=(GradingEnv &) = delete;
-  GradingEnv &&operator=(GradingEnv &&) = delete;
+  MTEnv(MTEnv &) = delete;
+  MTEnv(MTEnv &&) = delete;
+  MTEnv &operator=(MTEnv &) = delete;
+  MTEnv &&operator=(MTEnv &&) = delete;
 
   // Adds a test to the environment. A test is a tuple containing:
   // (name, feedback, function)
-  void add_test(std::tuple<std::string, std::string, GEFunction> t)
+  void add_test(std::tuple<std::string, std::string, MTFunction> t)
   {
     auto [name, feedback, func] = t;
-    _tests.push_back(GETest{GradingEnv::_idCounter, name, feedback, func});
-    GradingEnv::_idCounter++;
+    _tests.push_back(MTTest{MTEnv::_idCounter, name, feedback, func});
+    MTEnv::_idCounter++;
   }
 
   // Same as above but takes a list of tuples in the following form:
   // { (name, feedback, function)* }
   void add_test(
-      const std::initializer_list<std::tuple<std::string, std::string, GEFunction>> &tests)
+      const std::initializer_list<std::tuple<std::string, std::string, MTFunction>> &tests)
   {
     for (const auto &test : tests)
     {
@@ -114,9 +114,9 @@ public:
     std::for_each(
         _tests.begin(),
         _tests.end(),
-        [this](GETest &it) {
+        [this](MTTest &it) {
           _currentTest.release();
-          _currentTest = std::make_unique<GETest>(it);
+          _currentTest = std::make_unique<MTTest>(it);
           // Each function needs the environment, thus *this
           it.f(*this);
         });
@@ -207,7 +207,7 @@ private:
     }
     else
     {
-      _records.emplace(_currentTest->id, GERecords{rec});
+      _records.emplace(_currentTest->id, MTRecords{rec});
     }
   }
 
@@ -223,13 +223,13 @@ private:
           int failedRecord = 0;
           testCounter++;
 
-          GETest test = _tests.at(pair.first);
+          MTTest test = _tests.at(pair.first);
           std::cout << "\u001b[32m[RUNNING " << test.name << "]\033[0m" << std::endl;
           // For each record in the test
           std::for_each(
               std::begin(pair.second),
               std::end(pair.second),
-              [&](const GERecord &rec) {
+              [&](const MTRecord &rec) {
                 if (rec.pass == false)
                 {
                   failedRecord++;
@@ -259,17 +259,17 @@ private:
 
 private:
   static int _idCounter;
-  std::unique_ptr<GETest> _currentTest;
-  std::vector<GETest> _tests;
-  std::map<int, GERecords> _records;
+  std::unique_ptr<MTTest> _currentTest;
+  std::vector<MTTest> _tests;
+  std::map<int, MTRecords> _records;
 };
 
-int GradingEnv::_idCounter = 0;
+int MTEnv::_idCounter = 0;
 
 // Generates a test to avoid boilerplate using the following semantics:
 // test_f("name" { ... })
 // the GravingEnv& is in the scope as env
 #define test_f(Name, Feedback, Scope)           \
   {                                             \
-    Name, Feedback, [&](GradingEnv & env) Scope \
+    Name, Feedback, [&](MTEnv & env) Scope \
   }\
