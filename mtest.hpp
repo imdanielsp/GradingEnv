@@ -216,6 +216,24 @@ public:
                  }, printable);
   }
 
+  /* Runs F and assert that at least one exception is thrown, otherwise fails. */
+  template<typename F = std::function<void()>>
+  void expect_any_except(const F& f, bool printable = false)
+  {
+    bool passed = false;
+
+    try {
+      f();
+    } catch(...) {
+      passed = true;
+    }
+
+    expect<bool>(passed, "No exception occured.",
+                 [](bool val) {
+                   return val == true;
+                 }, printable);
+  }
+
   /* Runs F and assert that no expections are thrown, otherwise fails. */
   template<typename F = std::function<void()>>
   void expect_no_except(const F& f, bool printable = false)

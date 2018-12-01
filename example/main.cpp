@@ -104,11 +104,17 @@ int main(int argc, char const *argv[])
         int c = a + b;
         (void) c; // Silents the "unused variable" warning from the compiler.
       });
+
+      env.expect_any_except([]() {
+        class RandomException {};
+
+        throw RandomException();
+      }, true);
     })
   );
 
   ge.add_test(
-    test_f("Test Exception Negative", "The exception occured as expected..", {
+    test_f("Test Exception Negative", "Expecting failure...", {
       /* Note: this is a template method with a default std::function<void()> */
       env.expect_except<std::out_of_range>([](){
         int a = 1, b = 2;
@@ -118,6 +124,9 @@ int main(int argc, char const *argv[])
 
       env.expect_no_except([]() {
         throw std::out_of_range("Testing the Exception handler");
+      }, true);
+
+      env.expect_any_except([]() {
       }, true);
     })
   );
