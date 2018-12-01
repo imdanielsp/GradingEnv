@@ -195,6 +195,49 @@ public:
                  }, printable);
   }
 
+  /* Runs F and expect E, otherwise fails. */
+  template <typename E, typename F = std::function<void()>>
+  void expect_except(const F& f, bool printable = false)
+  {
+    bool passed = false;
+
+    std::stringstream reason;
+    reason << typeid(E).name() << " did not occur.";
+
+    try {
+      f();
+    } catch(const E&) {
+      passed = true;
+    }
+
+    expect<bool>(passed, reason.str(),
+                 [](bool val) {
+                  return val == true;
+                 }, printable);
+  }
+
+  /* Runs F and assert that no expections are thrown, otherwise fails. */
+  template<typename F = std::function<void()>>
+  void expect_no_except(const F& f, bool printable = false)
+  {
+    bool passed = true;
+    std::stringstream reason;
+
+    try {
+      f();
+    } catch(...) {
+      passed = false;
+      auto except = std::current_exception();
+
+      reason << "Exception " << typeid(except).name() << " occured.";
+    }
+
+    expect<bool>(passed, reason.str(),
+                 [](bool val) {
+                   return val == true;
+                 }, printable);
+  }
+
 private:
   // Inserts a list of records in the record map if it doesn't exist, otherwise
   // appends a the given record to the record lists associated with the current

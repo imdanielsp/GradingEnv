@@ -92,6 +92,36 @@ int main(int argc, char const *argv[])
     })
   );
 
+  ge.add_test(
+    test_f("Test Exception", "The exeception occured", {
+      env.expect_except<std::out_of_range>([](){
+        throw std::out_of_range("Testing the Exception handler");
+      });
+
+      /* Note: this is a template method with a default std::function<void()> */
+      env.expect_no_except([]() {
+        int a = 1, b = 2;
+        int c = a + b;
+        (void) c; // Silents the "unused variable" warning from the compiler.
+      });
+    })
+  );
+
+  ge.add_test(
+    test_f("Test Exception Negative", "The exception occured as expected..", {
+      /* Note: this is a template method with a default std::function<void()> */
+      env.expect_except<std::out_of_range>([](){
+        int a = 1, b = 2;
+        int c = a + b;
+        (void) c; // Silents the "unused variable" warning from the compiler.
+      }, true);
+
+      env.expect_no_except([]() {
+        throw std::out_of_range("Testing the Exception handler");
+      }, true);
+    })
+  );
+
   // Run all tests
   ge.run_all(true, true);
 
